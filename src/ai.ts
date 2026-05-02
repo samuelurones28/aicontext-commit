@@ -48,7 +48,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
     } else {
       const client = new OpenAI()
       const response = await client.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }]
       })
