@@ -8,3 +8,6 @@ contexto.md
 node_modules/
 #dist
 dist/
+#demo
+demo.tape
+demo.*

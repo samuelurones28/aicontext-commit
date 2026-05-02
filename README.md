@@ -4,6 +4,9 @@
 
 `acc` looks at what you have staged with `git add`, scans your recent commits to learn how *this* project writes commits, and asks an LLM (Anthropic or OpenAI) for **3 ready-to-use suggestions**. Pick one, tweak it, or regenerate.
 
+[![demo](https://asciinema.org/a/XglB22EcqvZLQPDM.svg)](https://asciinema.org/a/XglB22EcqvZLQPDM)
+
+
 ## Features
 
 - 🧠 **Context-aware** — uses your last 30 commits as a style reference (language, casing, format, level of detail)
