@@ -23,6 +23,14 @@ export function parseCommitSuggestions(text: string): string[] {
     .slice(0, 3)
 }
 
+export function buildOpenAIChatCompletionRequest(prompt: string) {
+  return {
+    model: 'gpt-5.4-mini',
+    max_completion_tokens: 1024,
+    messages: [{ role: 'user' as const, content: prompt }]
+  }
+}
+
 export async function generateCommitMessages(prompt: string): Promise<string[]> {
   const provider = detectProvider()
 
@@ -47,11 +55,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
 
     } else {
       const client = new OpenAI()
-      const response = await client.chat.completions.create({
-        model: 'gpt-5.4-mini',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }]
-      })
+      const response = await client.chat.completions.create(buildOpenAIChatCompletionRequest(prompt))
       rawText = response.choices[0]?.message?.content ?? ''
     }
   } catch (error: unknown) {

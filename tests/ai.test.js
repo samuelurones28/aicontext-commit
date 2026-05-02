@@ -1,7 +1,11 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { generateCommitMessages, parseCommitSuggestions } = require('../dist/ai')
+const {
+  buildOpenAIChatCompletionRequest,
+  generateCommitMessages,
+  parseCommitSuggestions
+} = require('../dist/ai')
 
 test('parseCommitSuggestions extracts exactly the first three numbered suggestions', () => {
   const result = parseCommitSuggestions(`
@@ -31,6 +35,15 @@ Notes:
     'feat(cli): valid suggestion',
     'fix(ai): parse model output'
   ])
+})
+
+test('buildOpenAIChatCompletionRequest uses the current token limit parameter', () => {
+  const request = buildOpenAIChatCompletionRequest('prompt')
+
+  assert.equal(request.model, 'gpt-5.4-mini')
+  assert.equal(request.max_completion_tokens, 1024)
+  assert.equal(Object.hasOwn(request, 'max_tokens'), false)
+  assert.deepEqual(request.messages, [{ role: 'user', content: 'prompt' }])
 })
 
 test('generateCommitMessages reports missing provider configuration clearly', async () => {
