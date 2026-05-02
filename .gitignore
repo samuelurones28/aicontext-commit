@@ -1,0 +1,10 @@
+# aicontext-commit  
+contexto.md
+#.envlocal
+.env
+#.env
+.env
+#node_modules
+node_modules/
+#dist
+dist/
