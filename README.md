@@ -79,7 +79,7 @@ Press `Ctrl+C` at any time to abort cleanly — no commit is created.
 
 1. **Read git** — runs `git diff --cached` for the staged changes and `git log --oneline -30` for style context.
 2. **Build prompt** — wraps both into a structured prompt that asks the model to summarize the *entire* staged diff as one commit (not one suggestion per file) and to match the repo's existing style.
-3. **Call the model** — Claude Sonnet 4 by default if `ANTHROPIC_API_KEY` is set, otherwise OpenAI.
+3. **Call the model** — Claude Sonnet 4 by default if `ANTHROPIC_API_KEY` is set, otherwise gpt-5.4-mini if `OPENAI_API_KEY` is set.
 4. **Parse 3 suggestions** — strict format `1. … / 2. … / 3. …`; if parsing fails you get a clear error, not a bad commit.
 5. **Commit** — runs `git commit -m "<your choice>"` with the message you confirmed.
 
