@@ -6,6 +6,7 @@ export type CliErrorCode =
   | 'GIT_COMMIT_FAILED'
   | 'GIT_DIFF_FAILED'
   | 'MISSING_API_KEY'
+  | 'NOT_GIT_REPOSITORY'
   | 'NO_STAGED_CHANGES'
   | 'PROMPT_CANCELLED'
   | 'STAGED_DIFF_TOO_LARGE'
@@ -53,7 +54,7 @@ export function isPromptCancelError(error: unknown): boolean {
 export function messageFromUnknown(error: unknown): string {
   if (error instanceof Error && error.message.trim()) return error.message
   if (typeof error === 'string' && error.trim()) return error
-  return 'Error desconocido'
+  return 'Unknown error'
 }
 
 export function formatCliError(error: unknown): string {
@@ -66,7 +67,7 @@ export function formatCliError(error: unknown): string {
 
   const lines = [
     `${pc.red('Error:')} ${cliError.message}`,
-    pc.dim(`Código: ${cliError.code}`)
+    pc.dim(`Code: ${cliError.code}`)
   ]
 
   for (const detail of cliError.details) {

@@ -9,9 +9,9 @@ function detectProvider(): AIProvider {
   if (process.env.OPENAI_API_KEY) return 'openai'
   throw new CliError({
     code: 'MISSING_API_KEY',
-    message: 'No se encontró una API key de IA.',
-    details: ['Define ANTHROPIC_API_KEY u OPENAI_API_KEY como variable de entorno.']
-  })
+    message: 'No AI API key found.',
+    details: ['Set ANTHROPIC_API_KEY or OPENAI_API_KEY as an environment variable.']
+})
 }
 
 export function parseCommitSuggestions(text: string): string[] {
@@ -40,7 +40,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
       if (block?.type !== 'text') {
         throw new CliError({
           code: 'UNEXPECTED_RESPONSE',
-          message: 'Anthropic devolvió una respuesta sin texto utilizable.'
+          message: 'Anthropic returned a response with no usable text.'
         })
       }
       rawText = block.text
@@ -59,9 +59,9 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
 
     throw new CliError({
       code: 'AI_PROVIDER_ERROR',
-      message: `No se pudieron generar sugerencias con ${provider}.`,
+      message: `Could not generate suggestions with ${provider}.`,
       details: [
-        'Revisa tu conexión, la API key y el estado del proveedor.',
+        'Check your connection, the API key, and the provider status.',
         messageFromUnknown(error)
       ],
       cause: error
@@ -73,10 +73,10 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
   if (suggestions.length !== 3) {
     throw new CliError({
       code: 'AI_PARSE_ERROR',
-      message: 'No se pudieron parsear exactamente 3 sugerencias.',
+      message: 'Failed to parse exactly 3 suggestions.',
       details: [
-        'Regenera las sugerencias o escribe el mensaje manualmente.',
-        `Respuesta del modelo: ${truncate(rawText)}`
+        'Regenerate the suggestions or write the message manually.',
+        `Model response: ${truncate(rawText)}`
       ]
     })
   }
@@ -85,7 +85,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
 }
 
 function truncate(text: string, maxLength = 500): string {
-  if (!text.trim()) return '(vacía)'
+  if (!text.trim()) return '(empty)'
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength) + '...'
 }

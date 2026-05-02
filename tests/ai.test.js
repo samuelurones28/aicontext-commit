@@ -47,7 +47,7 @@ test('generateCommitMessages reports missing provider configuration clearly', as
         assert.equal(error.code, 'MISSING_API_KEY')
         assert.match(error.message, /API key/)
         assert.deepEqual(error.details, [
-          'Define ANTHROPIC_API_KEY u OPENAI_API_KEY como variable de entorno.'
+          'Set ANTHROPIC_API_KEY or OPENAI_API_KEY as an environment variable.'
         ])
         return true
       }

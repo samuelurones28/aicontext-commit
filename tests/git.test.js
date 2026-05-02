@@ -41,7 +41,7 @@ test('getStagedDiff returns the cached diff and rejects empty staged changes', (
   withCwd(repo, () => {
     assert.throws(
       () => getStagedDiff(),
-      /No hay cambios staged/
+      /No staged changes found/
     )
 
     fs.writeFileSync(path.join(repo, 'README.md'), '# Test\n')
@@ -54,16 +54,16 @@ test('getStagedDiff returns the cached diff and rejects empty staged changes', (
   })
 })
 
-test('getStagedDiff reports git context errors with an actionable code', () => {
+test('getStagedDiff reports non-git directories before reading the staged diff', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aicontext-commit-no-repo-'))
 
   withCwd(directory, () => {
     assert.throws(
       () => getStagedDiff(),
       error => {
-        assert.equal(error.code, 'GIT_DIFF_FAILED')
-        assert.match(error.message, /diff staged/)
-        assert.ok(error.details.some(detail => detail.includes('repositorio git')))
+        assert.equal(error.code, 'NOT_GIT_REPOSITORY')
+        assert.match(error.message, /git repository/)
+        assert.ok(error.details.some(detail => detail.includes('staged changes')))
         return true
       }
     )
