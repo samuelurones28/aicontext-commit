@@ -29,7 +29,11 @@
     "cli",
     "conventional-commits"
   ],
-  "author": "Samuel Fernandez",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/samuelurones28/aicontext-commit.git"
+  },
+  "author": "Samuelurones28",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
