@@ -1,4 +1,7 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
 const test = require('node:test')
 
 const {
@@ -6,6 +9,16 @@ const {
   generateCommitMessages,
   parseCommitSuggestions
 } = require('../dist/ai')
+
+async function withCwd(cwd, callback) {
+  const previous = process.cwd()
+  process.chdir(cwd)
+  try {
+    return await callback()
+  } finally {
+    process.chdir(previous)
+  }
+}
 
 test('parseCommitSuggestions extracts exactly the first three numbered suggestions', () => {
   const result = parseCommitSuggestions(`
@@ -49,22 +62,25 @@ test('buildOpenAIChatCompletionRequest uses the current token limit parameter', 
 test('generateCommitMessages reports missing provider configuration clearly', async () => {
   const previousAnthropicKey = process.env.ANTHROPIC_API_KEY
   const previousOpenAiKey = process.env.OPENAI_API_KEY
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'aicontext-commit-no-env-'))
 
   delete process.env.ANTHROPIC_API_KEY
   delete process.env.OPENAI_API_KEY
 
   try {
-    await assert.rejects(
-      () => generateCommitMessages('prompt'),
-      error => {
-        assert.equal(error.code, 'MISSING_API_KEY')
-        assert.match(error.message, /API key/)
-        assert.deepEqual(error.details, [
-          'Set ANTHROPIC_API_KEY or OPENAI_API_KEY as an environment variable.'
-        ])
-        return true
-      }
-    )
+    await withCwd(directory, async () => {
+      await assert.rejects(
+        () => generateCommitMessages('prompt'),
+        error => {
+          assert.equal(error.code, 'MISSING_API_KEY')
+          assert.match(error.message, /API key/)
+          assert.deepEqual(error.details, [
+            'Set ANTHROPIC_API_KEY or OPENAI_API_KEY as an environment variable.'
+          ])
+          return true
+        }
+      )
+    })
   } finally {
     if (previousAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY
     else process.env.ANTHROPIC_API_KEY = previousAnthropicKey

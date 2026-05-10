@@ -15,7 +15,7 @@
 - 📐 **Conventional Commits** — picks the right type from the diff (`feat`, `fix`, `docs`, `build`, `ci`, `refactor`…)
 - 🔁 **Regenerate / edit / manual** — you stay in control of the final message
 - 🤝 **Two providers** — works with Anthropic (Claude) or OpenAI; uses whichever key you have set
-- 🛡️ **Safe by design** — won't run without staged changes, refuses oversized diffs, treats history and diff as data (not as instructions)
+- 🛡️ **Safe by design** — won't run without staged changes, refuses oversized diffs, redacts common secrets, and treats history and diff as data
 
 ## Installation
 
@@ -41,7 +41,7 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-If both are set, Anthropic is used. You can also drop them into a `.env` file in your project root — `acc` loads it automatically. See `.env.example` for the format.
+If both are set, Anthropic is used. You can also drop them into a `.env` file in your project root. `acc` reads only the supported API key names from that file and does not inject the whole file into the process environment. See `.env.example` for the format.
 
 ## Usage
 
@@ -91,7 +91,9 @@ Press `Ctrl+C` at any time to abort cleanly — no commit is created.
 - **No staged changes** → exits with a clear message before calling any API.
 - **Not a git repo** → exits with a clear message.
 - **Diff over ~60k characters** → refuses and asks you to split the commit. Keeps token usage and quality predictable.
-- **Prompt injection** → the prompt explicitly tells the model to treat the diff and history as data, not instructions.
+- **Secret redaction** → common API keys, bearer tokens, private keys, and credential assignments are redacted before the diff/history is sent to the model.
+- **Prompt injection** → instructions are placed before untrusted repo data, code fences are escaped, and the prompt tells the model to treat the diff and history as data.
+- **Git hooks** → `git commit` runs with a sanitized environment so API keys and secret-looking variables are not passed to hooks.
 
 ## Development
 

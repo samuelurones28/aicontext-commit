@@ -1,11 +1,13 @@
 export function buildPrompt(diff: string, recentCommits: string): string {
   const hasHistory = recentCommits.trim().length > 0
+  const safeDiff = escapeCodeFence(diff)
+  const safeRecentCommits = escapeCodeFence(recentCommits)
 
   const styleSection = hasHistory
     ? `## Repository style
 These are the latest commits in the repository. Analyze their style, format, language, casing, level of detail, and conventions:
 
-${recentCommits}
+${safeRecentCommits}
 
 `
     : `## Repository style
@@ -14,11 +16,6 @@ There are no previous commits. Use standard Conventional Commits with English de
 `
 
   return `You are an expert Git assistant. Your task is to generate clear, useful commit messages for staged changes.
-
-${styleSection}## Staged changes
-\`\`\`diff
-${diff}
-\`\`\`
 
 ## Instructions
 - Generate EXACTLY 3 commit message suggestions
@@ -46,9 +43,18 @@ ${diff}
 - Keep each message on a single line, with no explanations
 - Order suggestions from most specific to least specific
 
+${styleSection}## Staged changes
+\`\`\`diff
+${safeDiff}
+\`\`\`
+
 ## Response format
 Return ONLY this, with no additional text:
 1. <message>
 2. <message>
 3. <message>`
+}
+
+function escapeCodeFence(text: string): string {
+  return text.replace(/```/g, '``\\`')
 }

@@ -1,12 +1,24 @@
 import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { CliError, messageFromUnknown } from './errors'
+import { AI_API_KEY_NAMES, readConfigValue, redactSecrets } from './security'
 
 export type AIProvider = 'anthropic' | 'openai'
 
-function detectProvider(): AIProvider {
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic'
-  if (process.env.OPENAI_API_KEY) return 'openai'
+type ProviderCredentials = {
+  provider: AIProvider
+  apiKey: string
+}
+
+const AI_REQUEST_TIMEOUT_MS = 30_000
+
+function detectProvider(): ProviderCredentials {
+  const anthropicApiKey = readConfigValue(AI_API_KEY_NAMES[0])
+  if (anthropicApiKey) return { provider: 'anthropic', apiKey: anthropicApiKey }
+
+  const openaiApiKey = readConfigValue(AI_API_KEY_NAMES[1])
+  if (openaiApiKey) return { provider: 'openai', apiKey: openaiApiKey }
+
   throw new CliError({
     code: 'MISSING_API_KEY',
     message: 'No AI API key found.',
@@ -32,13 +44,13 @@ export function buildOpenAIChatCompletionRequest(prompt: string) {
 }
 
 export async function generateCommitMessages(prompt: string): Promise<string[]> {
-  const provider = detectProvider()
+  const { provider, apiKey } = detectProvider()
 
   let rawText = ''
 
   try {
     if (provider === 'anthropic') {
-      const client = new Anthropic()
+      const client = new Anthropic({ apiKey, timeout: AI_REQUEST_TIMEOUT_MS })
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1024,
@@ -54,7 +66,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
       rawText = block.text
 
     } else {
-      const client = new OpenAI()
+      const client = new OpenAI({ apiKey, timeout: AI_REQUEST_TIMEOUT_MS })
       const response = await client.chat.completions.create(buildOpenAIChatCompletionRequest(prompt))
       rawText = response.choices[0]?.message?.content ?? ''
     }
@@ -66,7 +78,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
       message: `Could not generate suggestions with ${provider}.`,
       details: [
         'Check your connection, the API key, and the provider status.',
-        messageFromUnknown(error)
+        redactSecrets(messageFromUnknown(error)).text
       ],
       cause: error
     })
@@ -75,12 +87,15 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
   const suggestions = parseCommitSuggestions(rawText)
 
   if (suggestions.length !== 3) {
+    const redactedResponse = redactSecrets(rawText).text
     throw new CliError({
       code: 'AI_PARSE_ERROR',
       message: 'Failed to parse exactly 3 suggestions.',
       details: [
         'Regenerate the suggestions or write the message manually.',
-        `Model response: ${truncate(rawText)}`
+        process.env.DEBUG
+          ? `Model response: ${truncate(redactedResponse)}`
+          : 'Set DEBUG=1 to inspect the redacted raw model response.'
       ]
     })
   }

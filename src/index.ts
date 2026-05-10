@@ -1,12 +1,13 @@
-import 'dotenv/config'
 import pc from 'picocolors'
-import { select, input } from '@inquirer/prompts'
+import input from '@inquirer/input'
+import select from '@inquirer/select'
 import { getStagedDiff, getRecentCommits } from './git'
 import { buildPrompt } from './prompt'
 import { generateCommitMessages } from './ai'
 import { execFileSync } from 'child_process'
 import * as readline from 'readline'
 import { CliError, formatCliError, isCliError, isPromptCancelError } from './errors'
+import { redactSecrets, sanitizeEnvForGit } from './security'
 
 function editableInput(promptText: string, initialValue: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -28,6 +29,7 @@ function editableInput(promptText: string, initialValue: string): Promise<string
 }
 
 const VERSION = '0.1.0'
+const GIT_COMMIT_TIMEOUT_MS = 60_000
 
 const HELP = `
 Usage: aicontext-commit [options]
@@ -58,10 +60,17 @@ async function main() {
   console.log(pc.dim('Reading staged changes...'))
   const diff = getStagedDiff()
   const commits = getRecentCommits(30)
+  const redactedDiff = redactSecrets(diff)
+  const redactedCommits = redactSecrets(commits)
+  const redactionCount = redactedDiff.redactionCount + redactedCommits.redactionCount
+
+  if (redactionCount > 0) {
+    console.log(pc.yellow(`Redacted ${redactionCount} potential secret(s) before sending context to AI.`))
+  }
 
   // 2. Generate suggestions
   console.log(pc.dim('Generating suggestions...'))
-  const prompt = buildPrompt(diff, commits)
+  const prompt = buildPrompt(redactedDiff.text, redactedCommits.text)
   let suggestions = await generateCommitMessages(prompt)
 
   // 3. Show options to the user
@@ -100,7 +109,11 @@ async function main() {
 
 function doCommit(message: string) {
   try {
-    execFileSync('git', ['commit', '-m', message], { stdio: 'inherit' })
+    execFileSync('git', ['commit', '-m', message], {
+      stdio: 'inherit',
+      timeout: GIT_COMMIT_TIMEOUT_MS,
+      env: sanitizeEnvForGit()
+    })
     console.log(pc.green('✓ Commit created'))
   } catch (error: unknown) {
     throw new CliError({
