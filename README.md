@@ -1,6 +1,6 @@
 # aicontext-commit
 
-> CLI that writes your commit messages by reading the staged diff **and** the repo's history — so suggestions match the style, language, and conventions you already use.
+> Commit messages that sound like **your team** wrote them, not a generic LLM. `acc` reads your last 30 commits before writing a single word — matching your style, language, and conventions automatically.
 
 `acc` looks at what you have staged with `git add`, scans your recent commits to learn how *this* project writes commits, and asks an LLM (Anthropic or OpenAI) for **3 ready-to-use suggestions**. Pick one, tweak it, or regenerate.
 

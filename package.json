@@ -1,7 +1,7 @@
 {
   "name": "aicontext-commit",
   "version": "0.1.0",
-  "description": "CLI tool that generates commit messages by analyzing the repository history with AI",
+  "description": "AI commit messages that match your team's style — reads your last 30 commits to learn your conventions before suggesting anything",
   "bin": {
     "aicontext-commit": "./bin/index.js",
     "acc": "./bin/index.js"
