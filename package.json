@@ -1,6 +1,6 @@
 {
   "name": "aicontext-commit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI commit messages that match your team's style — reads your last 30 commits to learn your conventions before suggesting anything",
   "bin": {
     "aicontext-commit": "./bin/index.js",
