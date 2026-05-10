@@ -5,7 +5,27 @@ import { getStagedDiff, getRecentCommits } from './git'
 import { buildPrompt } from './prompt'
 import { generateCommitMessages } from './ai'
 import { execFileSync } from 'child_process'
+import * as readline from 'readline'
 import { CliError, formatCliError, isCliError, isPromptCancelError } from './errors'
+
+function editableInput(promptText: string, initialValue: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true })
+    process.stdout.write(promptText)
+    rl.write(initialValue)
+    rl.once('line', (line) => {
+      rl.close()
+      resolve(line.trim() || initialValue)
+    })
+    rl.once('SIGINT', () => {
+      rl.close()
+      process.stdout.write('\n')
+      const err = new Error('User force closed the prompt')
+      err.name = 'ExitPromptError'
+      reject(err)
+    })
+  })
+}
 
 async function main() {
   // 1. Read git
@@ -45,10 +65,7 @@ async function main() {
 
     // Let the user edit the selected suggestion before committing.
     const selected = suggestions[Number(choice)]
-    const edited = await input({
-      message: 'Edit the message if needed (Enter to confirm):',
-      default: selected
-    })
+    const edited = await editableInput(pc.green('?') + ' Edit if needed (Enter to confirm): ', selected)
 
     doCommit(edited.trim())
     break
