@@ -3,8 +3,8 @@
   "version": "0.1.1",
   "description": "AI commit messages that match your team's style — reads your last 30 commits to learn your conventions before suggesting anything",
   "bin": {
-    "aicontext-commit": "./bin/index.js",
-    "acc": "./bin/index.js"
+    "aicontext-commit": "bin/index.js",
+    "acc": "bin/index.js"
   },
   "files": [
     "bin",
@@ -31,7 +31,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/samuelurones28/aicontext-commit.git"
+    "url": "git+https://github.com/samuelurones28/aicontext-commit.git"
   },
   "author": "Samuelurones28",
   "license": "MIT",
