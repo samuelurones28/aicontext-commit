@@ -27,7 +27,33 @@ function editableInput(promptText: string, initialValue: string): Promise<string
   })
 }
 
+const VERSION = '0.1.0'
+
+const HELP = `
+Usage: aicontext-commit [options]
+
+Generate AI-powered commit messages from your staged changes.
+
+Options:
+  -v, --version   Show version number
+  -h, --help      Show this help message
+
+Before running, stage your changes with git add.
+`.trim()
+
 async function main() {
+  const args = process.argv.slice(2)
+
+  if (args.includes('--version') || args.includes('-v')) {
+    console.log(VERSION)
+    process.exit(0)
+  }
+
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(HELP)
+    process.exit(0)
+  }
+
   // 1. Read git
   console.log(pc.dim('Reading staged changes...'))
   const diff = getStagedDiff()
