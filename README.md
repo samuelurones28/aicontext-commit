@@ -49,7 +49,7 @@ By default `acc` uses small, fast, cheap models — a commit message doesn't nee
 
 | Provider | Default model | Notes |
 |---|---|---|
-| Anthropic | `claude-haiku-4-5` | |
+| Anthropic | `claude-haiku-5-5` | |
 | OpenAI | `gpt-6-luna` | reasoning disabled (`reasoning_effort: none`) for speed |
 
 To use a different model, set `ACC_MODEL` (env var or `.env`):
@@ -97,7 +97,7 @@ Press `Ctrl+C` at any time to abort cleanly — no commit is created.
 
 1. **Read git** — runs `git diff --cached` for the staged changes (lockfiles are summarized with `--stat` instead of sent in full) and the subjects of the last 30 non-merge commits for style context.
 2. **Build prompt** — wraps both into a structured prompt that asks the model to summarize the *entire* staged diff as one commit (not one suggestion per file) and to match the repo's existing style.
-3. **Call the model** — `claude-haiku-4-5` if `ANTHROPIC_API_KEY` is set, otherwise `gpt-6-luna` if `OPENAI_API_KEY` is set (override with `ACC_MODEL`).
+3. **Call the model** — `claude-haiku-5-5` if `ANTHROPIC_API_KEY` is set, otherwise `gpt-6-luna` if `OPENAI_API_KEY` is set (override with `ACC_MODEL`).
 4. **Parse 3 suggestions** — strict format `1. … / 2. … / 3. …`; if parsing fails you get a clear error, not a bad commit.
 5. **Commit** — runs `git commit -m "<your choice>"` with the message you confirmed.
 

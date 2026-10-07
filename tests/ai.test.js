@@ -69,7 +69,7 @@ test('resolveModel uses ACC_MODEL when set and per-provider defaults otherwise',
   const previous = process.env.ACC_MODEL
   try {
     delete process.env.ACC_MODEL
-    assert.equal(resolveModel('anthropic'), 'claude-haiku-4-5')
+    assert.equal(resolveModel('anthropic'), 'claude-haiku-5-5')
     assert.equal(resolveModel('openai'), 'gpt-6-luna')
 
     process.env.ACC_MODEL = 'claude-sonnet-5-5'

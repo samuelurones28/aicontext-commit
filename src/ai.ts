@@ -16,7 +16,7 @@ const MAX_OUTPUT_TOKENS = 200
 
 // Small, fast models: commit messages don't need a large model or reasoning.
 export const DEFAULT_MODELS: Record<AIProvider, string> = {
-  anthropic: 'claude-haiku-4-5',
+  anthropic: 'claude-haiku-5-5',
   openai: 'gpt-6-luna'
 }
 
