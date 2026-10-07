@@ -88,3 +88,55 @@ test('getRecentCommits returns the latest commits using the requested limit', ()
     assert.doesNotMatch(commits, /feat: first commit/)
   })
 })
+
+test('getStagedDiff summarizes lockfiles instead of sending their content', () => {
+  const repo = makeRepo()
+
+  withCwd(repo, () => {
+    fs.writeFileSync(path.join(repo, 'index.js'), 'console.log(1)\n')
+    fs.writeFileSync(path.join(repo, 'package-lock.json'), '{"lockfileVersion": 3}\n')
+    runGit(['add', '.'], repo)
+
+    const diff = getStagedDiff()
+
+    assert.match(diff, /\+console\.log\(1\)/)
+    assert.match(diff, /Lockfile changes \(content omitted\)/)
+    assert.match(diff, /package-lock\.json \| 1 \+/)
+    assert.doesNotMatch(diff, /lockfileVersion/)
+  })
+})
+
+test('getStagedDiff still works when only a lockfile is staged', () => {
+  const repo = makeRepo()
+
+  withCwd(repo, () => {
+    fs.writeFileSync(path.join(repo, 'yarn.lock'), 'dep@1.0.0\n')
+    runGit(['add', '.'], repo)
+
+    assert.match(getStagedDiff(), /yarn\.lock/)
+  })
+})
+
+test('getStagedDiff sees the whole repo when run from a subdirectory', () => {
+  const repo = makeRepo()
+  fs.mkdirSync(path.join(repo, 'sub'))
+
+  fs.writeFileSync(path.join(repo, 'root.txt'), 'root\n')
+  runGit(['add', '.'], repo)
+
+  withCwd(path.join(repo, 'sub'), () => {
+    assert.match(getStagedDiff(), /\+root/)
+  })
+})
+
+test('getRecentCommits returns subjects only, without hashes or merges', () => {
+  const repo = makeRepo()
+
+  withCwd(repo, () => {
+    fs.writeFileSync(path.join(repo, 'one.txt'), 'one\n')
+    runGit(['add', 'one.txt'], repo)
+    runGit(['commit', '-m', 'feat: first commit'], repo)
+
+    assert.equal(getRecentCommits(5).trim(), 'feat: first commit')
+  })
+})

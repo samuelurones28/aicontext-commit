@@ -7,7 +7,8 @@ const test = require('node:test')
 const {
   buildOpenAIChatCompletionRequest,
   generateCommitMessages,
-  parseCommitSuggestions
+  parseCommitSuggestions,
+  resolveModel
 } = require('../dist/ai')
 
 async function withCwd(cwd, callback) {
@@ -53,10 +54,30 @@ Notes:
 test('buildOpenAIChatCompletionRequest uses the current token limit parameter', () => {
   const request = buildOpenAIChatCompletionRequest('prompt')
 
-  assert.equal(request.model, 'gpt-5.4-mini')
-  assert.equal(request.max_completion_tokens, 1024)
+  assert.equal(request.model, 'gpt-6-luna')
+  assert.equal(request.max_completion_tokens, 200)
+  assert.equal(request.reasoning_effort, 'none')
   assert.equal(Object.hasOwn(request, 'max_tokens'), false)
   assert.deepEqual(request.messages, [{ role: 'user', content: 'prompt' }])
+})
+
+test('buildOpenAIChatCompletionRequest accepts a model override', () => {
+  assert.equal(buildOpenAIChatCompletionRequest('prompt', 'gpt-5.4-nano').model, 'gpt-5.4-nano')
+})
+
+test('resolveModel uses ACC_MODEL when set and per-provider defaults otherwise', () => {
+  const previous = process.env.ACC_MODEL
+  try {
+    delete process.env.ACC_MODEL
+    assert.equal(resolveModel('anthropic'), 'claude-haiku-4-5')
+    assert.equal(resolveModel('openai'), 'gpt-6-luna')
+
+    process.env.ACC_MODEL = 'claude-sonnet-5-5'
+    assert.equal(resolveModel('anthropic'), 'claude-sonnet-5-5')
+  } finally {
+    if (previous === undefined) delete process.env.ACC_MODEL
+    else process.env.ACC_MODEL = previous
+  }
 })
 
 test('generateCommitMessages reports missing provider configuration clearly', async () => {

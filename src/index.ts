@@ -28,7 +28,8 @@ function editableInput(promptText: string, initialValue: string): Promise<string
   })
 }
 
-const VERSION = '0.1.0'
+// Resolves to the root package.json from both src/ (ts-node) and dist/.
+const { version: VERSION } = require('../package.json') as { version: string }
 const GIT_COMMIT_TIMEOUT_MS = 60_000
 
 const HELP = `

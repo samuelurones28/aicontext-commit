@@ -8,16 +8,24 @@ const GIT_LOG_TIMEOUT_MS = 5_000
 const DEFAULT_COMMIT_HISTORY_LIMIT = 30
 const MAX_COMMIT_HISTORY_LIMIT = 100
 
+// Lockfiles are large, machine-generated and say little about intent:
+// send only a --stat summary of them to save tokens.
+const LOCKFILE_NAMES = [
+  'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lock', 'bun.lockb',
+  'Cargo.lock', 'poetry.lock', 'uv.lock', 'Pipfile.lock', 'composer.lock', 'Gemfile.lock', 'go.sum'
+]
+const LOCKFILE_PATHSPECS = LOCKFILE_NAMES.map(name => `:(top,glob)**/${name}`)
+const NON_LOCKFILE_PATHSPECS = [':/', ...LOCKFILE_NAMES.map(name => `:(top,exclude,glob)**/${name}`)]
+
 export function getStagedDiff(): string {
   try {
     ensureGitWorkTree()
 
-    const diff = execFileSync('git', ['diff', '--cached', '--no-ext-diff', '--no-color'], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: GIT_COMMAND_TIMEOUT_MS,
-      maxBuffer: MAX_GIT_OUTPUT_BYTES
-    })
+    const codeDiff = runGitDiff(['--', ...NON_LOCKFILE_PATHSPECS])
+    const lockfileStat = runGitDiff(['--stat', '--', ...LOCKFILE_PATHSPECS])
+    const diff = lockfileStat.trim()
+      ? `${codeDiff}\n# Lockfile changes (content omitted):\n${lockfileStat}`
+      : codeDiff
     if (!diff.trim()) {
       throw new CliError({
         code: 'NO_STAGED_CHANGES',
@@ -53,6 +61,15 @@ export function getStagedDiff(): string {
   }
 }
 
+function runGitDiff(args: string[]): string {
+  return execFileSync('git', ['diff', '--cached', '--no-ext-diff', '--no-color', ...args], {
+    encoding: 'utf-8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    timeout: GIT_COMMAND_TIMEOUT_MS,
+    maxBuffer: MAX_GIT_OUTPUT_BYTES
+  })
+}
+
 function ensureGitWorkTree(): void {
   try {
     const isInsideWorkTree = execFileSync('git', ['rev-parse', '--is-inside-work-tree'], {
@@ -82,7 +99,7 @@ function ensureGitWorkTree(): void {
 export function getRecentCommits(n: number = 30): string {
   try {
     const limit = normalizeCommitLimit(n)
-    const commits = execFileSync('git', ['log', `-${limit}`, '--format=%h %s'], {
+    const commits = execFileSync('git', ['log', `-${limit}`, '--no-merges', '--format=%s'], {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
       timeout: GIT_LOG_TIMEOUT_MS,

@@ -11,6 +11,18 @@ type ProviderCredentials = {
 }
 
 const AI_REQUEST_TIMEOUT_MS = 30_000
+// Three one-line messages fit comfortably; a low cap keeps runs cheap and fast.
+const MAX_OUTPUT_TOKENS = 200
+
+// Small, fast models: commit messages don't need a large model or reasoning.
+export const DEFAULT_MODELS: Record<AIProvider, string> = {
+  anthropic: 'claude-haiku-4-5',
+  openai: 'gpt-6-luna'
+}
+
+export function resolveModel(provider: AIProvider): string {
+  return readConfigValue('ACC_MODEL') ?? DEFAULT_MODELS[provider]
+}
 
 function detectProvider(): ProviderCredentials {
   const anthropicApiKey = readConfigValue(AI_API_KEY_NAMES[0])
@@ -35,16 +47,20 @@ export function parseCommitSuggestions(text: string): string[] {
     .slice(0, 3)
 }
 
-export function buildOpenAIChatCompletionRequest(prompt: string) {
+export function buildOpenAIChatCompletionRequest(prompt: string, model: string = DEFAULT_MODELS.openai) {
   return {
-    model: 'gpt-5.4-mini',
-    max_completion_tokens: 1024,
+    model,
+    max_completion_tokens: MAX_OUTPUT_TOKENS,
+    // Skip reasoning: it adds latency and bills hidden output tokens for no gain here.
+    // 'none' is newer than the SDK's ReasoningEffort type, hence the cast.
+    reasoning_effort: 'none' as unknown as 'low',
     messages: [{ role: 'user' as const, content: prompt }]
   }
 }
 
 export async function generateCommitMessages(prompt: string): Promise<string[]> {
   const { provider, apiKey } = detectProvider()
+  const model = resolveModel(provider)
 
   let rawText = ''
 
@@ -52,8 +68,8 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
     if (provider === 'anthropic') {
       const client = new Anthropic({ apiKey, timeout: AI_REQUEST_TIMEOUT_MS })
       const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        model,
+        max_tokens: MAX_OUTPUT_TOKENS,
         messages: [{ role: 'user', content: prompt }]
       })
       const block = response.content[0]
@@ -67,7 +83,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
 
     } else {
       const client = new OpenAI({ apiKey, timeout: AI_REQUEST_TIMEOUT_MS })
-      const response = await client.chat.completions.create(buildOpenAIChatCompletionRequest(prompt))
+      const response = await client.chat.completions.create(buildOpenAIChatCompletionRequest(prompt, model))
       rawText = response.choices[0]?.message?.content ?? ''
     }
   } catch (error: unknown) {
@@ -75,7 +91,7 @@ export async function generateCommitMessages(prompt: string): Promise<string[]> 
 
     throw new CliError({
       code: 'AI_PROVIDER_ERROR',
-      message: `Could not generate suggestions with ${provider}.`,
+      message: `Could not generate suggestions with ${provider} (${model}).`,
       details: [
         'Check your connection, the API key, and the provider status.',
         redactSecrets(messageFromUnknown(error)).text

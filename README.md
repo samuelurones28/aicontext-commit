@@ -43,6 +43,21 @@ export OPENAI_API_KEY=sk-...
 
 If both are set, Anthropic is used. You can also drop them into a `.env` file in your project root. `acc` reads only the supported API key names from that file and does not inject the whole file into the process environment. See `.env.example` for the format.
 
+### Model
+
+By default `acc` uses small, fast, cheap models — a commit message doesn't need more:
+
+| Provider | Default model | Notes |
+|---|---|---|
+| Anthropic | `claude-haiku-4-5` | |
+| OpenAI | `gpt-6-luna` | reasoning disabled (`reasoning_effort: none`) for speed |
+
+To use a different model, set `ACC_MODEL` (env var or `.env`):
+
+```bash
+export ACC_MODEL=claude-sonnet-5-5
+```
+
 ## Usage
 
 ```bash
@@ -80,9 +95,9 @@ Press `Ctrl+C` at any time to abort cleanly — no commit is created.
 
 ## How it works
 
-1. **Read git** — runs `git diff --cached` for the staged changes and `git log --oneline -30` for style context.
+1. **Read git** — runs `git diff --cached` for the staged changes (lockfiles are summarized with `--stat` instead of sent in full) and the subjects of the last 30 non-merge commits for style context.
 2. **Build prompt** — wraps both into a structured prompt that asks the model to summarize the *entire* staged diff as one commit (not one suggestion per file) and to match the repo's existing style.
-3. **Call the model** — Claude Sonnet 4 by default if `ANTHROPIC_API_KEY` is set, otherwise gpt-5.4-mini if `OPENAI_API_KEY` is set.
+3. **Call the model** — `claude-haiku-4-5` if `ANTHROPIC_API_KEY` is set, otherwise `gpt-6-luna` if `OPENAI_API_KEY` is set (override with `ACC_MODEL`).
 4. **Parse 3 suggestions** — strict format `1. … / 2. … / 3. …`; if parsing fails you get a clear error, not a bad commit.
 5. **Commit** — runs `git commit -m "<your choice>"` with the message you confirmed.
 
@@ -90,6 +105,7 @@ Press `Ctrl+C` at any time to abort cleanly — no commit is created.
 
 - **No staged changes** → exits with a clear message before calling any API.
 - **Not a git repo** → exits with a clear message.
+- **Lockfiles** (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Cargo.lock`, `go.sum`, …) → only a `--stat` summary is sent, saving tokens.
 - **Diff over ~60k characters** → refuses and asks you to split the commit. Keeps token usage and quality predictable.
 - **Secret redaction** → common API keys, bearer tokens, private keys, and credential assignments are redacted before the diff/history is sent to the model.
 - **Prompt injection** → instructions are placed before untrusted repo data, code fences are escaped, and the prompt tells the model to treat the diff and history as data.
