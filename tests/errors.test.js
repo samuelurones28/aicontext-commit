@@ -1,14 +1,16 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
+const { stripVTControlCharacters } = require('node:util')
+
 const { CliError, formatCliError, isPromptCancelError, messageFromUnknown } = require('../dist/errors')
 
 test('formatCliError includes message, code and details', () => {
-  const output = formatCliError(new CliError({
+  const output = stripVTControlCharacters(formatCliError(new CliError({
     code: 'NO_STAGED_CHANGES',
     message: 'No staged changes found.',
     details: ['Use git add before running acc.']
-  }))
+  })))
 
   assert.match(output, /Error: No staged changes found\./)
   assert.match(output, /Code: NO_STAGED_CHANGES/)
@@ -16,7 +18,7 @@ test('formatCliError includes message, code and details', () => {
 })
 
 test('formatCliError normalizes unexpected errors', () => {
-  const output = formatCliError(new Error('Something failed internally'))
+  const output = stripVTControlCharacters(formatCliError(new Error('Something failed internally')))
 
   assert.match(output, /Something failed internally/)
   assert.match(output, /Code: UNEXPECTED_ERROR/)
