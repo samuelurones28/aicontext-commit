@@ -1,5 +1,7 @@
 # aicontext-commit
 
+[![npm](https://img.shields.io/npm/v/aicontext-commit)](https://www.npmjs.com/package/aicontext-commit) [![CI](https://github.com/samuelurones28/aicontext-commit/actions/workflows/ci.yml/badge.svg)](https://github.com/samuelurones28/aicontext-commit/actions/workflows/ci.yml) [![license](https://img.shields.io/npm/l/aicontext-commit)](./LICENSE)
+
 > Commit messages that sound like **your team** wrote them, not a generic LLM. `acc` reads your last 30 commits before writing a single word — matching your style, language, and conventions automatically.
 
 `acc` looks at what you have staged with `git add`, scans your recent commits to learn how *this* project writes commits, and asks an LLM (Anthropic or OpenAI) for **3 ready-to-use suggestions**. Pick one, tweak it, or regenerate.
