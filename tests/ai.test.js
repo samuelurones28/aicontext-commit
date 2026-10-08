@@ -5,6 +5,8 @@ const path = require('node:path')
 const test = require('node:test')
 
 const {
+  buildAnthropicMessageRequest,
+  buildOllamaChatCompletionRequest,
   buildOpenAIChatCompletionRequest,
   generateCommitMessages,
   parseCommitSuggestions,
@@ -71,6 +73,7 @@ test('resolveModel uses ACC_MODEL when set and per-provider defaults otherwise',
     delete process.env.ACC_MODEL
     assert.equal(resolveModel('anthropic'), 'claude-haiku-5-5')
     assert.equal(resolveModel('openai'), 'gpt-6-luna')
+    assert.equal(resolveModel('ollama'), 'qwen2.5-coder:7b')
 
     process.env.ACC_MODEL = 'claude-sonnet-5-5'
     assert.equal(resolveModel('anthropic'), 'claude-sonnet-5-5')
@@ -95,9 +98,8 @@ test('generateCommitMessages reports missing provider configuration clearly', as
         error => {
           assert.equal(error.code, 'MISSING_API_KEY')
           assert.match(error.message, /API key/)
-          assert.deepEqual(error.details, [
-            'Set ANTHROPIC_API_KEY or OPENAI_API_KEY as an environment variable.'
-          ])
+          assert.match(error.details.join(' '), /ANTHROPIC_API_KEY or OPENAI_API_KEY/)
+          assert.match(error.details.join(' '), /ACC_PROVIDER=ollama/)
           return true
         }
       )
@@ -109,4 +111,31 @@ test('generateCommitMessages reports missing provider configuration clearly', as
     if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY
     else process.env.OPENAI_API_KEY = previousOpenAiKey
   }
+})
+
+test('buildAnthropicMessageRequest disables thinking on Haiku and caches only when asked', () => {
+  const request = buildAnthropicMessageRequest('prompt')
+
+  assert.equal(request.model, 'claude-haiku-5-5')
+  assert.equal(request.max_tokens, 200)
+  assert.deepEqual(request.thinking, { type: 'disabled' })
+  assert.equal(Object.hasOwn(request, 'cache_control'), false)
+
+  const cached = buildAnthropicMessageRequest('prompt', 'claude-haiku-5-5', { cachePrompt: true })
+  assert.deepEqual(cached.cache_control, { type: 'ephemeral' })
+})
+
+test('buildAnthropicMessageRequest uses low effort on models whose thinking cannot be disabled', () => {
+  const request = buildAnthropicMessageRequest('prompt', 'claude-opus-5-5')
+
+  assert.equal(Object.hasOwn(request, 'thinking'), false)
+  assert.deepEqual(request.output_config, { effort: 'low' })
+  assert.ok(request.max_tokens > 200)
+})
+
+test('buildOllamaChatCompletionRequest omits OpenAI-only reasoning options', () => {
+  const request = buildOllamaChatCompletionRequest('prompt')
+
+  assert.equal(request.model, 'qwen2.5-coder:7b')
+  assert.equal(Object.hasOwn(request, 'reasoning_effort'), false)
 })

@@ -5,7 +5,7 @@ const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
-const { getRecentCommits, getStagedDiff } = require('../dist/git')
+const { DIFF_TRUNCATION_NOTE, fitDiffToBudget, getRecentCommits, getStagedDiff } = require('../dist/git')
 
 function runGit(args, cwd) {
   return execFileSync('git', args, {
@@ -100,7 +100,7 @@ test('getStagedDiff summarizes lockfiles instead of sending their content', () =
     const diff = getStagedDiff()
 
     assert.match(diff, /\+console\.log\(1\)/)
-    assert.match(diff, /Lockfile changes \(content omitted\)/)
+    assert.match(diff, /Lockfile and generated file changes \(content omitted\)/)
     assert.match(diff, /package-lock\.json \| 1 \+/)
     assert.doesNotMatch(diff, /lockfileVersion/)
   })
@@ -139,4 +139,48 @@ test('getRecentCommits returns subjects only, without hashes or merges', () => {
 
     assert.equal(getRecentCommits(5).trim(), 'feat: first commit')
   })
+})
+
+test('getStagedDiff summarizes generated files and sends one line of context', () => {
+  const repo = makeRepo()
+
+  withCwd(repo, () => {
+    fs.writeFileSync(path.join(repo, 'code.js'), 'a\nb\nc\nd\ne\nf\ng\n')
+    runGit(['add', '.'], repo)
+    runGit(['commit', '-m', 'feat: base'], repo)
+
+    fs.writeFileSync(path.join(repo, 'code.js'), 'a\nb\nc\nCHANGED\ne\nf\ng\n')
+    fs.writeFileSync(path.join(repo, 'bundle.min.js'), 'var minifiedSecretSauce=1\n')
+    runGit(['add', '.'], repo)
+
+    const diff = getStagedDiff()
+
+    assert.match(diff, /\+CHANGED/)
+    assert.match(diff, /^ c$/m)
+    assert.doesNotMatch(diff, /^ b$/m)
+    assert.match(diff, /bundle\.min\.js \| 1 \+/)
+    assert.doesNotMatch(diff, /minifiedSecretSauce/)
+  })
+})
+
+test('fitDiffToBudget leaves small diffs untouched', () => {
+  const diff = 'diff --git a/a b/a\n@@ -1 +1 @@\n-x\n+y\n'
+  assert.deepEqual(fitDiffToBudget(diff, 1000), { text: diff, truncated: false })
+})
+
+test('fitDiffToBudget keeps every file header and small files whole', () => {
+  const small = 'diff --git a/small.txt b/small.txt\n@@ -1 +1 @@\n-old\n+new\n'
+  const bigLines = Array.from({ length: 500 }, (_, i) => `+line ${i}`).join('\n')
+  const big = `diff --git a/big.txt b/big.txt\nindex 1..2\n@@ -0,0 +1,500 @@\n${bigLines}\n`
+
+  const { text, truncated } = fitDiffToBudget(big + small, 1000)
+
+  assert.equal(truncated, true)
+  assert.ok(text.startsWith(DIFF_TRUNCATION_NOTE))
+  assert.ok(text.includes(small))
+  assert.match(text, /diff --git a\/big\.txt/)
+  assert.match(text, /\+line 0/)
+  assert.match(text, /more line\(s\) omitted/)
+  assert.ok(text.indexOf('big.txt') < text.indexOf('small.txt'), 'file order is preserved')
+  assert.ok(text.length < 1200)
 })

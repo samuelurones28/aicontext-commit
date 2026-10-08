@@ -1,7 +1,7 @@
 import pc from 'picocolors'
 import input from '@inquirer/input'
 import select from '@inquirer/select'
-import { getStagedDiff, getRecentCommits } from './git'
+import { getStagedDiff, getRecentCommits, fitDiffToBudget } from './git'
 import { buildPrompt } from './prompt'
 import { generateCommitMessages } from './ai'
 import { execFileSync } from 'child_process'
@@ -69,9 +69,15 @@ async function main() {
     console.log(pc.yellow(`Redacted ${redactionCount} potential secret(s) before sending context to AI.`))
   }
 
+  // Truncate after redaction so a cut-off secret can't dodge the redaction patterns.
+  const budgetedDiff = fitDiffToBudget(redactedDiff.text)
+  if (budgetedDiff.truncated) {
+    console.log(pc.yellow('Large diff: sending a trimmed version to keep token usage low.'))
+  }
+
   // 2. Generate suggestions
   console.log(pc.dim('Generating suggestions...'))
-  const prompt = buildPrompt(redactedDiff.text, redactedCommits.text)
+  const prompt = buildPrompt(budgetedDiff.text, redactedCommits.text)
   let suggestions = await generateCommitMessages(prompt)
 
   // 3. Show options to the user
@@ -87,7 +93,8 @@ async function main() {
 
     if (choice === 'regenerate') {
       console.log(pc.dim('Regenerating...'))
-      suggestions = await generateCommitMessages(prompt)
+      // The prompt is identical, so cache it: further regenerations cost ~10% of the input.
+      suggestions = await generateCommitMessages(prompt, { cachePrompt: true })
       continue
     }
 

@@ -1,30 +1,34 @@
 import { execFileSync } from 'child_process'
 import { CliError, isCliError, messageFromUnknown } from './errors'
 
-const MAX_STAGED_DIFF_CHARACTERS = 60_000
+// Roughly 4k tokens: enough to understand a change, cheap to send on every run.
+export const DIFF_BUDGET_CHARACTERS = 16_000
+export const DIFF_TRUNCATION_NOTE = '# Diff truncated to fit the token budget'
 const MAX_GIT_OUTPUT_BYTES = 1_000_000
 const GIT_COMMAND_TIMEOUT_MS = 10_000
 const GIT_LOG_TIMEOUT_MS = 5_000
 const DEFAULT_COMMIT_HISTORY_LIMIT = 30
 const MAX_COMMIT_HISTORY_LIMIT = 100
 
-// Lockfiles are large, machine-generated and say little about intent:
+// Lockfiles and generated files are large, machine-made and say little about intent:
 // send only a --stat summary of them to save tokens.
-const LOCKFILE_NAMES = [
+const SUMMARIZED_FILE_PATTERNS = [
   'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lock', 'bun.lockb',
-  'Cargo.lock', 'poetry.lock', 'uv.lock', 'Pipfile.lock', 'composer.lock', 'Gemfile.lock', 'go.sum'
+  'Cargo.lock', 'poetry.lock', 'uv.lock', 'Pipfile.lock', 'composer.lock', 'Gemfile.lock', 'go.sum',
+  '*.min.js', '*.min.css', '*.map', '*.snap'
 ]
-const LOCKFILE_PATHSPECS = LOCKFILE_NAMES.map(name => `:(top,glob)**/${name}`)
-const NON_LOCKFILE_PATHSPECS = [':/', ...LOCKFILE_NAMES.map(name => `:(top,exclude,glob)**/${name}`)]
+const SUMMARIZED_PATHSPECS = SUMMARIZED_FILE_PATTERNS.map(pattern => `:(top,glob)**/${pattern}`)
+const DETAILED_PATHSPECS = [':/', ...SUMMARIZED_FILE_PATTERNS.map(pattern => `:(top,exclude,glob)**/${pattern}`)]
 
 export function getStagedDiff(): string {
   try {
     ensureGitWorkTree()
 
-    const codeDiff = runGitDiff(['--', ...NON_LOCKFILE_PATHSPECS])
-    const lockfileStat = runGitDiff(['--stat', '--', ...LOCKFILE_PATHSPECS])
-    const diff = lockfileStat.trim()
-      ? `${codeDiff}\n# Lockfile changes (content omitted):\n${lockfileStat}`
+    // One line of context instead of three: the model needs the change, not the surroundings.
+    const codeDiff = runGitDiff(['--unified=1', '--', ...DETAILED_PATHSPECS])
+    const summarizedStat = runGitDiff(['--stat', '--', ...SUMMARIZED_PATHSPECS])
+    const diff = summarizedStat.trim()
+      ? `${codeDiff}\n# Lockfile and generated file changes (content omitted):\n${summarizedStat}`
       : codeDiff
     if (!diff.trim()) {
       throw new CliError({
@@ -33,20 +37,18 @@ export function getStagedDiff(): string {
         details: ['Use git add before running acc.']
       })
     }
-    if (diff.length > MAX_STAGED_DIFF_CHARACTERS) {
-      throw new CliError({
-        code: 'STAGED_DIFF_TOO_LARGE',
-        message: `The staged diff is too large (${diff.length} characters).`,
-        details: [
-          `The current limit is ${MAX_STAGED_DIFF_CHARACTERS} characters.`,
-          'Split the changes into smaller commits.'
-        ]
-      })
-    }
     return diff
   } catch (error: unknown) {
     if (isCliError(error)) {
       throw error
+    }
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOBUFS') {
+      throw new CliError({
+        code: 'STAGED_DIFF_TOO_LARGE',
+        message: 'The staged diff is too large to read.',
+        details: ['Split the changes into smaller commits.'],
+        cause: error
+      })
     }
     throw new CliError({
       code: 'GIT_DIFF_FAILED',
@@ -59,6 +61,45 @@ export function getStagedDiff(): string {
       cause: error
     })
   }
+}
+
+/**
+ * Caps the diff at a fixed character budget so large commits cost the same as
+ * medium ones. Every file keeps its header; small files are kept whole and the
+ * remaining budget is shared evenly among the larger ones. Run it after secret
+ * redaction so a truncated secret can never slip past the redaction patterns.
+ */
+export function fitDiffToBudget(diff: string, budget: number = DIFF_BUDGET_CHARACTERS): { text: string, truncated: boolean } {
+  if (diff.length <= budget) return { text: diff, truncated: false }
+
+  const sections = diff.split(/(?=^diff --git )/m)
+  const kept: string[] = new Array(sections.length)
+  const bySize = sections.map((section, index) => ({ section, index })).sort((a, b) => a.section.length - b.section.length)
+
+  let remaining = budget
+  bySize.forEach(({ section, index }, position) => {
+    const share = Math.floor(remaining / (bySize.length - position))
+    kept[index] = section.length <= share ? section : truncateSection(section, share)
+    remaining -= kept[index].length
+  })
+
+  return { text: `${DIFF_TRUNCATION_NOTE}\n${kept.join('')}`, truncated: true }
+}
+
+function truncateSection(section: string, maxLength: number): string {
+  const lines = section.split('\n')
+  const header = lines.findIndex(line => line.startsWith('@@'))
+  let kept = header === -1 ? lines.slice(0, 1) : lines.slice(0, header)
+  let length = kept.join('\n').length
+
+  for (const line of lines.slice(kept.length)) {
+    if (length + line.length + 1 > maxLength) break
+    kept.push(line)
+    length += line.length + 1
+  }
+
+  const omitted = lines.length - kept.length
+  return `${kept.join('\n')}\n# ... ${omitted} more line(s) omitted\n`
 }
 
 function runGitDiff(args: string[]): string {

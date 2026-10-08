@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
 
-const { buildPrompt } = require('../dist/prompt')
+const { buildPrompt, summarizeCommitStyle } = require('../dist/prompt')
 
 test('buildPrompt asks for global commit summaries instead of per-file suggestions', () => {
   const prompt = buildPrompt(
@@ -25,4 +25,30 @@ test('buildPrompt keeps instructions before untrusted data and escapes code fenc
   assert.ok(prompt.indexOf('## Instructions') < prompt.indexOf('## Staged changes'))
   assert.doesNotMatch(prompt, /\+```md/)
   assert.match(prompt, /\+``\\`md/)
+})
+
+test('summarizeCommitStyle describes conventional commits and common scopes', () => {
+  const summary = summarizeCommitStyle([
+    'feat(cli): add picker',
+    'fix(cli): handle ctrl+c',
+    'feat(git): read diff',
+    'docs: update readme'
+  ])
+
+  assert.match(summary, /Conventional Commits in 4 of 4/)
+  assert.match(summary, /common scopes: cli, git/)
+})
+
+test('summarizeCommitStyle flags free-form histories', () => {
+  assert.match(summarizeCommitStyle(['Add picker', 'Fix bug', 'feat: x']), /only 1 of 3/)
+  assert.equal(summarizeCommitStyle([]), '')
+})
+
+test('buildPrompt sends only the latest 10 commits as examples', () => {
+  const commits = Array.from({ length: 30 }, (_, i) => `feat: commit number ${i}`).join('\n')
+  const prompt = buildPrompt('diff --git a/a b/a', commits)
+
+  assert.match(prompt, /commit number 9\b/)
+  assert.doesNotMatch(prompt, /commit number 10\b/)
+  assert.match(prompt, /Conventional Commits in 30 of 30/)
 })

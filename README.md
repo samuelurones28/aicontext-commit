@@ -14,7 +14,8 @@
 - 🌍 **Auto-detects language** — writes in whatever language your history uses, falling back to English
 - 📐 **Conventional Commits** — picks the right type from the diff (`feat`, `fix`, `docs`, `build`, `ci`, `refactor`…)
 - 🔁 **Regenerate / edit / manual** — you stay in control of the final message
-- 🤝 **Two providers** — works with Anthropic (Claude) or OpenAI; uses whichever key you have set
+- 🤝 **Three providers** — Anthropic (Claude), OpenAI, or a free local model through Ollama
+- 💸 **Token-frugal** — compact diffs, a fixed budget for large commits, a locally computed style summary, and cached regenerations
 - 🛡️ **Safe by design** — won't run without staged changes, refuses oversized diffs, redacts common secrets, and treats history and diff as data
 
 ## Installation
@@ -41,7 +42,18 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-If both are set, Anthropic is used. You can also drop them into a `.env` file in your project root. `acc` reads only the supported API key names from that file and does not inject the whole file into the process environment. See `.env.example` for the format.
+If both are set, Anthropic is used.
+
+### Free local mode (Ollama)
+
+No API key? Run a local model with [Ollama](https://ollama.com) — free, and your code never leaves your machine:
+
+```bash
+ollama pull qwen2.5-coder:7b
+export ACC_PROVIDER=ollama
+```
+
+`ACC_PROVIDER=ollama` takes precedence over any API key. Without it, Ollama is used only when no API key is set and `OLLAMA_HOST` is (default host: `http://localhost:11434`). You can also drop them into a `.env` file in your project root. `acc` reads only the supported API key names from that file and does not inject the whole file into the process environment. See `.env.example` for the format.
 
 ### Model
 
@@ -51,6 +63,7 @@ By default `acc` uses small, fast, cheap models — a commit message doesn't nee
 |---|---|---|
 | Anthropic | `claude-haiku-5-5` | |
 | OpenAI | `gpt-6-luna` | reasoning disabled (`reasoning_effort: none`) for speed |
+| Ollama | `qwen2.5-coder:7b` | runs locally, no cost |
 
 To use a different model, set `ACC_MODEL` (env var or `.env`):
 
@@ -95,18 +108,21 @@ Press `Ctrl+C` at any time to abort cleanly — no commit is created.
 
 ## How it works
 
-1. **Read git** — runs `git diff --cached` for the staged changes (lockfiles are summarized with `--stat` instead of sent in full) and the subjects of the last 30 non-merge commits for style context.
-2. **Build prompt** — wraps both into a structured prompt that asks the model to summarize the *entire* staged diff as one commit (not one suggestion per file) and to match the repo's existing style.
-3. **Call the model** — `claude-haiku-5-5` if `ANTHROPIC_API_KEY` is set, otherwise `gpt-6-luna` if `OPENAI_API_KEY` is set (override with `ACC_MODEL`).
-4. **Parse 3 suggestions** — strict format `1. … / 2. … / 3. …`; if parsing fails you get a clear error, not a bad commit.
-5. **Commit** — runs `git commit -m "<your choice>"` with the message you confirmed.
+1. **Read git** — runs `git diff --cached --unified=1` for the staged changes (lockfiles and generated files are summarized with `--stat` instead of sent in full) and the subjects of the last 30 non-merge commits.
+2. **Analyze style locally** — computes Conventional Commits usage, common scopes, and subject length from those 30 commits without any API call, and keeps only the 10 latest as examples.
+3. **Build prompt** — wraps both into a structured prompt that asks the model to summarize the *entire* staged diff as one commit (not one suggestion per file) and to match the repo's existing style.
+4. **Call the model** — Ollama if `ACC_PROVIDER=ollama`, otherwise `claude-haiku-5-5` if `ANTHROPIC_API_KEY` is set, otherwise `gpt-6-luna` if `OPENAI_API_KEY` is set (override with `ACC_MODEL`).
+5. **Parse 3 suggestions** — strict format `1. … / 2. … / 3. …`; if parsing fails you get a clear error, not a bad commit.
+6. **Commit** — runs `git commit -m "<your choice>"` with the message you confirmed.
 
 ## Limits & safeguards
 
 - **No staged changes** → exits with a clear message before calling any API.
 - **Not a git repo** → exits with a clear message.
-- **Lockfiles** (`package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Cargo.lock`, `go.sum`, …) → only a `--stat` summary is sent, saving tokens.
-- **Diff over ~60k characters** → refuses and asks you to split the commit. Keeps token usage and quality predictable.
+- **Lockfiles and generated files** (`package-lock.json`, `yarn.lock`, `Cargo.lock`, `go.sum`, `*.min.js`, `*.map`, `*.snap`, …) → only a `--stat` summary is sent, saving tokens.
+- **Large diffs** → capped at ~16k characters (~4k tokens). Every file keeps its header, small files stay whole, and large files are trimmed evenly, so big commits cost the same as medium ones.
+- **Regenerate** → the identical prompt is cached on Anthropic, so further regenerations bill the input at ~10%.
+- **Thinking off** → thinking is disabled on Claude Haiku, and models where it can't be disabled run at the lowest effort.
 - **Secret redaction** → common API keys, bearer tokens, private keys, and credential assignments are redacted before the diff/history is sent to the model.
 - **Prompt injection** → instructions are placed before untrusted repo data, code fences are escaped, and the prompt tells the model to treat the diff and history as data.
 - **Git hooks** → `git commit` runs with a sanitized environment so API keys and secret-looking variables are not passed to hooks.
