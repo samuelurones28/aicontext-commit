@@ -1,6 +1,6 @@
 {
   "name": "aicontext-commit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "AI commit messages that match your team's style — learns from your git history. Works with Claude, OpenAI, or free local models via Ollama",
   "bin": {
     "aicontext-commit": "bin/index.js",
