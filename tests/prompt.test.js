@@ -3,6 +3,23 @@ const test = require('node:test')
 
 const { buildPrompt, summarizeCommitStyle } = require('../dist/prompt')
 
+test('automatic language follows history and falls back to English', () => {
+  const prompt = buildPrompt('diff', 'feat: añade selector', 'auto')
+  assert.match(prompt, /dominant natural language from previous commits/)
+  assert.match(prompt, /cannot be detected confidently, write descriptions in English/)
+  assert.match(buildPrompt('diff', ''), /with English descriptions/)
+})
+
+test('explicit language overrides history and empty-history defaults', () => {
+  for (const history of ['', 'feat: add picker']) {
+    const prompt = buildPrompt('diff', history, 'es')
+    assert.match(prompt, /Write all commit descriptions in Español \(language code: es\)/)
+    assert.match(prompt, /selected language overrides/)
+    assert.match(prompt, /Keep Conventional Commit types in English/)
+    assert.doesNotMatch(prompt, /with English descriptions|match their language|write descriptions in English/)
+  }
+})
+
 test('buildPrompt asks for global commit summaries instead of per-file suggestions', () => {
   const prompt = buildPrompt(
     `diff --git a/src/git.ts b/src/git.ts

@@ -13,7 +13,7 @@
 
 - 🧠 **Context-aware** — uses your last 30 commits as a style reference (language, casing, format, level of detail)
 - ✍️ **3 suggestions per run** — alternative phrasings for the same change, ordered most-specific first
-- 🌍 **Auto-detects language** — writes in whatever language your history uses, falling back to English
+- 🌍 **Choose the language** — select a language or automatically follow your history, falling back to English
 - 📐 **Conventional Commits** — picks the right type from the diff (`feat`, `fix`, `docs`, `build`, `ci`, `refactor`…)
 - 🔁 **Regenerate / edit / manual** — you stay in control of the final message
 - 🤝 **Three providers** — Anthropic (Claude), OpenAI, or a free local model through Ollama
@@ -55,7 +55,7 @@ ollama pull qwen2.5-coder:7b
 export ACC_PROVIDER=ollama
 ```
 
-`ACC_PROVIDER=ollama` takes precedence over any API key. Without it, Ollama is used only when no API key is set and `OLLAMA_HOST` is (default host: `http://localhost:11434`). You can also drop them into a `.env` file in your project root. `acc` reads only the supported API key names from that file and does not inject the whole file into the process environment. See `.env.example` for the format.
+`ACC_PROVIDER=ollama` takes precedence over any API key. Without it, Ollama is used only when no API key is set and `OLLAMA_HOST` is (default host: `http://localhost:11434`). You can also drop them into a `.env` file in your project root. `acc` reads supported configuration values from that file and does not inject the whole file into the process environment. See `.env.example` for the format.
 
 ### Model
 
@@ -87,6 +87,7 @@ You'll see something like:
 
 ```
 Reading staged changes...
+? Choose the commit language: Automatic (from commit history)
 Generating suggestions...
 ? Choose a commit message: (Use arrow keys)
 ❯ feat(cli): add commit picker with 3 AI suggestions
@@ -97,6 +98,28 @@ Generating suggestions...
 ```
 
 Pick a suggestion → edit it inline if you want → press Enter → commit is created. Done.
+
+### Commit language
+
+By default, `acc` asks you to select a language before generating suggestions. Choose **Automatic** to follow the dominant language in your commit history (English if there is no history or the language is unclear).
+
+To skip the language picker for a run:
+
+```bash
+acc --language es   # Spanish descriptions
+acc -l en          # English descriptions
+acc --language auto # Detect from history
+```
+
+Set a default in your environment or the project's `.env` file:
+
+```bash
+ACC_LANGUAGE=es
+```
+
+Supported codes: `auto`, `en` (English), `es` (Spanish), `fr` (French), `de` (German), `it` (Italian), `pt` (Portuguese), `ca` (Catalan), `ja` (Japanese), `zh` (Chinese), and `ko` (Korean).
+
+Precedence: CLI option → environment variable → `.env` → interactive picker. An explicit language overrides the language of previous commits while preserving their style. Conventional Commit types (`feat`, `fix`, etc.) stay in English. Regenerations keep the chosen language.
 
 ### Options on the picker
 

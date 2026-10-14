@@ -8,6 +8,7 @@ import { execFileSync } from 'child_process'
 import * as readline from 'readline'
 import { CliError, formatCliError, isCliError, isPromptCancelError } from './errors'
 import { redactSecrets, sanitizeEnvForGit } from './security'
+import { COMMIT_LANGUAGES, CommitLanguage, resolveCommitLanguage } from './language'
 
 function editableInput(promptText: string, initialValue: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -38,10 +39,12 @@ Usage: aicontext-commit [options]
 Generate AI-powered commit messages from your staged changes.
 
 Options:
+  -l, --language <code>  Commit language (auto, en, es, fr, de, it, pt, ca, ja, zh, ko)
   -v, --version   Show version number
   -h, --help      Show this help message
 
 Before running, stage your changes with git add.
+Set ACC_LANGUAGE in your environment or .env to skip the language picker.
 `.trim()
 
 async function main() {
@@ -56,6 +59,8 @@ async function main() {
     console.log(HELP)
     process.exit(0)
   }
+
+  let language = resolveCommitLanguage(args)
 
   // 1. Read git
   console.log(pc.dim('Reading staged changes...'))
@@ -75,9 +80,19 @@ async function main() {
     console.log(pc.yellow('Large diff: sending a trimmed version to keep token usage low.'))
   }
 
+  if (language === undefined) {
+    language = await select<CommitLanguage>({
+      message: 'Choose the commit language:',
+      default: 'auto',
+      choices: Object.entries(COMMIT_LANGUAGES).map(([value, name]) => ({
+        name, value: value as CommitLanguage
+      }))
+    })
+  }
+
   // 2. Generate suggestions
   console.log(pc.dim('Generating suggestions...'))
-  const prompt = buildPrompt(budgetedDiff.text, redactedCommits.text)
+  const prompt = buildPrompt(budgetedDiff.text, redactedCommits.text, language)
   let suggestions = await generateCommitMessages(prompt)
 
   // 3. Show options to the user
